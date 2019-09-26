@@ -38,24 +38,25 @@ void VersionEdit::Clear() {
   new_files_.clear();
 }
 
+// 已分析
 void VersionEdit::EncodeTo(std::string* dst) const {
-  if (has_comparator_) {
+  if (has_comparator_) {  // true
     PutVarint32(dst, kComparator);
     PutLengthPrefixedSlice(dst, comparator_);
   }
-  if (has_log_number_) {
+  if (has_log_number_) {  // true
     PutVarint32(dst, kLogNumber);
     PutVarint64(dst, log_number_);
   }
-  if (has_prev_log_number_) {
+  if (has_prev_log_number_) {  // false
     PutVarint32(dst, kPrevLogNumber);
     PutVarint64(dst, prev_log_number_);
   }
-  if (has_next_file_number_) {
+  if (has_next_file_number_) {  // true
     PutVarint32(dst, kNextFileNumber);
     PutVarint64(dst, next_file_number_);
   }
-  if (has_last_sequence_) {
+  if (has_last_sequence_) {  // true
     PutVarint32(dst, kLastSequence);
     PutVarint64(dst, last_sequence_);
   }
@@ -63,6 +64,8 @@ void VersionEdit::EncodeTo(std::string* dst) const {
   for (size_t i = 0; i < compact_pointers_.size(); i++) {
     PutVarint32(dst, kCompactPointer);
     PutVarint32(dst, compact_pointers_[i].first);  // level
+    // Encode指的是取出其中的Slice
+    // 这里是有转换的string -> Slice
     PutLengthPrefixedSlice(dst, compact_pointers_[i].second.Encode());
   }
 
@@ -78,6 +81,8 @@ void VersionEdit::EncodeTo(std::string* dst) const {
     PutVarint32(dst, new_files_[i].first);  // level
     PutVarint64(dst, f.number);
     PutVarint64(dst, f.file_size);
+    // string -> slice
+    // InternalKey 是一层封装
     PutLengthPrefixedSlice(dst, f.smallest.Encode());
     PutLengthPrefixedSlice(dst, f.largest.Encode());
   }

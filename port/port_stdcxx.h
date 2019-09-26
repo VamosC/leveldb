@@ -75,6 +75,15 @@ class CondVar {
   void Wait() {
     std::unique_lock<std::mutex> lock(mu_->mu_, std::adopt_lock);
     cv_.wait(lock);
+    // ~unique_lock<mutex>
+    // If the object currently owns a lock on the managed mutex object, its
+    // unlock member is called before destroying the object.
+    // release()
+    // Note that this function does not lock nor unlock the returned mutex
+    // object.
+    // 以上就是区别 因为在代码中mutex是不能被释放的
+    // 注意到之前锁住是MutexLock干的
+    // 因此这里调用的是release让unique_lock失去管理锁的权利而已
     lock.release();
   }
   void Signal() { cv_.notify_one(); }

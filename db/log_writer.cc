@@ -14,6 +14,7 @@ namespace leveldb {
 namespace log {
 
 static void InitTypeCrc(uint32_t* type_crc) {
+  // kMaxRecordType = 4
   for (int i = 0; i <= kMaxRecordType; i++) {
     char t = static_cast<char>(i);
     type_crc[i] = crc32c::Value(&t, 1);
@@ -21,6 +22,7 @@ static void InitTypeCrc(uint32_t* type_crc) {
 }
 
 Writer::Writer(WritableFile* dest) : dest_(dest), block_offset_(0) {
+  // 初始化crc校验表
   InitTypeCrc(type_crc_);
 }
 
@@ -31,6 +33,9 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 
 Writer::~Writer() = default;
 
+// 已分析
+// type只是用来区分片段的位置 是开头 还是中间 还是结尾
+// kHeaderSize = 7 bytes = 4 bytes checksum + 2 bytes length + 1 byte type
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
   size_t left = slice.size();
@@ -41,8 +46,11 @@ Status Writer::AddRecord(const Slice& slice) {
   Status s;
   bool begin = true;
   do {
+    // kBlockSize = 32768
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
+    // kHeaderSize = 7 bytes = 4 bytes checksum + 2 bytes length + 1 byte type
+    // 填padding
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
@@ -60,6 +68,7 @@ Status Writer::AddRecord(const Slice& slice) {
     const size_t fragment_length = (left < avail) ? left : avail;
 
     RecordType type;
+    // type只是用来区分片段的位置 是开头 还是中间 还是结尾
     const bool end = (left == fragment_length);
     if (begin && end) {
       type = kFullType;
@@ -79,9 +88,12 @@ Status Writer::AddRecord(const Slice& slice) {
   return s;
 }
 
+// 已分析
+// 填入checksum
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
                                   size_t length) {
   assert(length <= 0xffff);  // Must fit in two bytes
+  // kBlockSize = 32768
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
   // Format the header
@@ -90,8 +102,11 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   buf[5] = static_cast<char>(length >> 8);
   buf[6] = static_cast<char>(t);
 
+  // crc单独看
+  // 一种checksum
   // Compute the crc of the record type and the payload.
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
+  // 一种混淆的手段
   crc = crc32c::Mask(crc);  // Adjust for storage
   EncodeFixed32(buf, crc);
 

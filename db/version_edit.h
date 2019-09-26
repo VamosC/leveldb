@@ -45,7 +45,7 @@ class VersionEdit {
     has_prev_log_number_ = true;
     prev_log_number_ = num;
   }
-  void SetNextFile(uint64_t num) {
+  void SetNextFile(uint64_t num) {  // 2
     has_next_file_number_ = true;
     next_file_number_ = num;
   }

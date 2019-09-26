@@ -281,6 +281,7 @@ uint32_t Extend(uint32_t crc, const char* data, size_t n) {
 
   const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
   const uint8_t* e = p + n;
+  // l xor 0xffffffff
   uint32_t l = crc ^ kCRC32Xor;
 
 // Process one byte at a time.

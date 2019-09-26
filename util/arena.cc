@@ -8,15 +8,22 @@ namespace leveldb {
 
 static const int kBlockSize = 4096;
 
+// 已分析
 Arena::Arena()
     : alloc_ptr_(nullptr), alloc_bytes_remaining_(0), memory_usage_(0) {}
 
+// 已分析
 Arena::~Arena() {
   for (size_t i = 0; i < blocks_.size(); i++) {
     delete[] blocks_[i];
   }
 }
 
+// 已分析
+// 首先看bytes的大小是否大于1/4默认分配空间大小
+// 如果大于 那么觉得留下的空间可能会有比较大的浪费
+// 所以直接按照实际的大小来分配空间
+// 如果小于 那么就分配默认空间 并设置好剩余空间大小以及指针
 char* Arena::AllocateFallback(size_t bytes) {
   if (bytes > kBlockSize / 4) {
     // Object is more than a quarter of our block size.  Allocate it separately
@@ -35,11 +42,15 @@ char* Arena::AllocateFallback(size_t bytes) {
   return result;
 }
 
+// 已分析
 char* Arena::AllocateAligned(size_t bytes) {
   const int align = (sizeof(void*) > 8) ? sizeof(void*) : 8;
   static_assert((align & (align - 1)) == 0,
                 "Pointer size should be a power of 2");
   size_t current_mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align - 1);
+  // e.g. align = 8
+  // alloc_ptr_ % 8 == alloc_ptr_ & 7
+  // 是否整除
   size_t slop = (current_mod == 0 ? 0 : align - current_mod);
   size_t needed = bytes + slop;
   char* result;
@@ -55,9 +66,14 @@ char* Arena::AllocateAligned(size_t bytes) {
   return result;
 }
 
+// 已分析
+// 分配新空间并加入block数组
+// 为了之后的释放
 char* Arena::AllocateNewBlock(size_t block_bytes) {
   char* result = new char[block_bytes];
   blocks_.push_back(result);
+  // memory_usage_在最底层获取memory的时候进行记录
+  // sizeof(char*)是为了记录而花费的开销 block的一项entry
   memory_usage_.fetch_add(block_bytes + sizeof(char*),
                           std::memory_order_relaxed);
   return result;

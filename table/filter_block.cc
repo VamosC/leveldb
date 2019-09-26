@@ -26,9 +26,17 @@ void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
   }
 }
 
+// 已分析
+// 将key加入到一个string中
+// 并记录起始的位置
 void FilterBlockBuilder::AddKey(const Slice& key) {
+  // 这里我觉得没必要copy一个Slice
   Slice k = key;
+  // 存入key的起始位置
+  // std::vector<size_t>
   start_.push_back(keys_.size());
+  // keys_后面接上key
+  // keys => std::string
   keys_.append(k.data(), k.size());
 }
 

@@ -66,6 +66,7 @@ class MemTable {
   friend class MemTableIterator;
   friend class MemTableBackwardIterator;
 
+  // 已分析
   struct KeyComparator {
     const InternalKeyComparator comparator;
     explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) {}
@@ -78,7 +79,9 @@ class MemTable {
 
   KeyComparator comparator_;
   int refs_;
+  // Arena负责内存管理
   Arena arena_;
+  // Table实际上是skiplist跳表
   Table table_;
 };
 

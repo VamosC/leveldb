@@ -15,6 +15,7 @@
 namespace leveldb {
 
 // Update CMakeLists.txt if you change these
+// 不知道干啥用的做个标记
 static const int kMajorVersion = 1;
 static const int kMinorVersion = 22;
 
@@ -26,6 +27,7 @@ class WriteBatch;
 // Abstract handle to particular state of a DB.
 // A Snapshot is an immutable object and can therefore be safely
 // accessed from multiple threads without any external synchronization.
+// Snapshot 可能是快照？ 由于只读所以可以多线程安全访问
 class LEVELDB_EXPORT Snapshot {
  protected:
   virtual ~Snapshot();

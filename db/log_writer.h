@@ -45,6 +45,7 @@ class Writer {
   // crc32c values for all supported record types.  These are
   // pre-computed to reduce the overhead of computing the crc of the
   // record type stored in the header.
+  // kMaxRecordType = 4
   uint32_t type_crc_[kMaxRecordType + 1];
 };
 

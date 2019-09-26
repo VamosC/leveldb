@@ -14,9 +14,14 @@
 namespace leveldb {
 
 // A utility routine: write "data" to the named file and Sync() it.
+// 具体实现见env.cc
+// 将data写入 file 并同步也就是刷新至文件
+// 已分析
 Status WriteStringToFileSync(Env* env, const Slice& data,
                              const std::string& fname);
 
+// dbname/000001.suffix
+// 已分析
 static std::string MakeFileName(const std::string& dbname, uint64_t number,
                                 const char* suffix) {
   char buf[100];
@@ -25,44 +30,70 @@ static std::string MakeFileName(const std::string& dbname, uint64_t number,
   return dbname + buf;
 }
 
+// dbname/000001.log
+// 已分析
 std::string LogFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
   return MakeFileName(dbname, number, "log");
 }
 
+// dbname/000001.ldb
+// 已分析
 std::string TableFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
   return MakeFileName(dbname, number, "ldb");
 }
 
+// dbname/000001.sst
+// 已分析
 std::string SSTTableFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
   return MakeFileName(dbname, number, "sst");
 }
 
+// dbname/MANIFEST-000001
+// dbname/MANIFEST-%06llu
+// 已分析
 std::string DescriptorFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
   char buf[100];
+  // (1) 如果格式化后的字符串长度 < size,
+  // 则将此字符串全部复制到str中,并给其后添加一个字符串结束符('\0');
+  // (2) 如果格式化后的字符串长度 >= size,则只将其中的(size - 1)
+  // 个字符复制到str中,并给其后添加一个字符串结束符('\0')
+  // 返回值为欲写入的字符串长度
   snprintf(buf, sizeof(buf), "/MANIFEST-%06llu",
            static_cast<unsigned long long>(number));
   return dbname + buf;
 }
 
+// dbname/CURRENT
+// 已分析
 std::string CurrentFileName(const std::string& dbname) {
   return dbname + "/CURRENT";
 }
 
+// dbname/LOCK
+// 已分析
 std::string LockFileName(const std::string& dbname) { return dbname + "/LOCK"; }
 
+// dbname/000001.dbtmp
+// dbname/%06llu.dbtmp
+// 已分析
 std::string TempFileName(const std::string& dbname, uint64_t number) {
   assert(number > 0);
+  // "dbtmp"是后缀名
   return MakeFileName(dbname, number, "dbtmp");
 }
 
+// dbname/LOG
+// 已分析
 std::string InfoLogFileName(const std::string& dbname) {
   return dbname + "/LOG";
 }
 
+// dbname/LOG.old
+// 已分析
 // Return the name of the old info log file for "dbname".
 std::string OldInfoLogFileName(const std::string& dbname) {
   return dbname + "/LOG.old";
@@ -120,19 +151,29 @@ bool ParseFileName(const std::string& filename, uint64_t* number,
   return true;
 }
 
+// 将ManiFest的文件名写入Current
+// 已分析
 Status SetCurrentFile(Env* env, const std::string& dbname,
                       uint64_t descriptor_number) {
   // Remove leading "dbname/" and add newline to manifest file name
+  // dbname/MANIFEST-000001
   std::string manifest = DescriptorFileName(dbname, descriptor_number);
   Slice contents = manifest;
+  // 断言检查是否在dbname/目录下
   assert(contents.starts_with(dbname + "/"));
+  // 删除前缀 仅仅保留文件名称
   contents.remove_prefix(dbname.size() + 1);
+
+  // dbname/000001.dbtmp
   std::string tmp = TempFileName(dbname, descriptor_number);
   Status s = WriteStringToFileSync(env, contents.ToString() + "\n", tmp);
   if (s.ok()) {
+    // dbname/CURRENT
+    // std::rename(from, to);
     s = env->RenameFile(tmp, CurrentFileName(dbname));
   }
   if (!s.ok()) {
+    // unlink
     env->DeleteFile(tmp);
   }
   return s;

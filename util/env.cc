@@ -31,6 +31,7 @@ void Log(Logger* info_log, const char* format, ...) {
   }
 }
 
+// 已分析
 static Status DoWriteStringToFile(Env* env, const Slice& data,
                                   const std::string& fname, bool should_sync) {
   WritableFile* file;
@@ -45,6 +46,7 @@ static Status DoWriteStringToFile(Env* env, const Slice& data,
   if (s.ok()) {
     s = file->Close();
   }
+  // 由于s.ok()可能会失败
   delete file;  // Will auto-close if we did not close above
   if (!s.ok()) {
     env->DeleteFile(fname);
@@ -52,16 +54,25 @@ static Status DoWriteStringToFile(Env* env, const Slice& data,
   return s;
 }
 
+// 一层封装
+// 不需要同步
+// 已分析
 Status WriteStringToFile(Env* env, const Slice& data,
                          const std::string& fname) {
   return DoWriteStringToFile(env, data, fname, false);
 }
-
+// 一层封装
+// 需要同步
+// 已分析
 Status WriteStringToFileSync(Env* env, const Slice& data,
                              const std::string& fname) {
   return DoWriteStringToFile(env, data, fname, true);
 }
 
+// 已分析
+// 事实上是创建顺序读文件
+// 而顺序读文件真正的读操作是
+// 封装操作系统提供读的read接口
 Status ReadFileToString(Env* env, const std::string& fname, std::string* data) {
   data->clear();
   SequentialFile* file;

@@ -22,6 +22,8 @@ namespace leveldb {
 
 class MemTable;
 class TableCache;
+
+// What's Version/VersionEdit/VersionSet?
 class Version;
 class VersionEdit;
 class VersionSet;
@@ -184,6 +186,8 @@ class DBImpl : public DB {
 
   // Queue of writers.
   std::deque<Writer*> writers_ GUARDED_BY(mutex_);
+  // temporary batch
+  // for: not destory original batch
   WriteBatch* tmp_batch_ GUARDED_BY(mutex_);
 
   SnapshotList snapshots_ GUARDED_BY(mutex_);

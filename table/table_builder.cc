@@ -92,52 +92,89 @@ Status TableBuilder::ChangeOptions(const Options& options) {
 }
 
 void TableBuilder::Add(const Slice& key, const Slice& value) {
+  // 这里的Rep* r仅仅是为了名字的简单性
+  // 写代码更快 看起来更简洁罢了
+  // 有点下述代码的感觉 比如
+  // int nidsandandasndasdasda;
+  // int &r = nidsandandasndasdasda;
   Rep* r = rep_;
   assert(!r->closed);
+  // r->status.ok
+  // rep_->status.ok
   if (!ok()) return;
+  // r->num_entries > 0
+  // 否则没有办法比较
   if (r->num_entries > 0) {
+    // 下一个key肯定要比上一个key更“大”
+    // 否则说明系统出现了错误 因为memtable必定是sorted的
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
+  // init = false
+  // 进入的时候应该是下一个block
+  // 此时pending_index_entry是true
+  // 建立这个索引都是开到了下一个block的第一个key才干的
+  // lookached(1)
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
+    // 为了压缩索引值的长度
+    // 比如 whodasdasa 与whoeadsdads
+    // 完全可以用whoe来隔开
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
+    // offset是上一个block的起点 size是相对应的内容的长度
+    // 全部填入handle_encoding中
     r->pending_handle.EncodeTo(&handle_encoding);
+    // 加入index中方便索引寻找
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
   }
 
+  // 有filter机制
+  // add key
   if (r->filter_block != nullptr) {
     r->filter_block->AddKey(key);
   }
 
+  // 记录last_key
+  // last_key是上一个key的意思
   r->last_key.assign(key.data(), key.size());
+  // 数量+1
   r->num_entries++;
+  // 将key和value加入datablock中
   r->data_block.Add(key, value);
 
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
+  // 数据的大小与用户设置的block的大小相比较
+  // 决定是否刷入kernel区域, 进而进入disk
   if (estimated_block_size >= r->options.block_size) {
     Flush();
   }
 }
 
+// 已分析
 void TableBuilder::Flush() {
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
+  // datablock肯定是非空的
+  // 否则直接推出即可
   if (r->data_block.empty()) return;
   assert(!r->pending_index_entry);
   WriteBlock(&r->data_block, &r->pending_handle);
+  // rep_->status.ok
   if (ok()) {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
   }
+  // 建立filter机制
+  // 具体看filter 特别是bloom filter
   if (r->filter_block != nullptr) {
     r->filter_block->StartBlock(r->offset);
   }
 }
 
+// 压缩方式待分析
 void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
@@ -145,16 +182,23 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   //    crc: uint32
   assert(ok());
   Rep* r = rep_;
+  // datablock
+  // 得到要写的内容
+  // shared nonshared valuesize + nonshared的key + value
+  // 最后+start数组+start数组的size
   Slice raw = block->Finish();
 
   Slice block_contents;
   CompressionType type = r->options.compression;
   // TODO(postrelease): Support more compression options: zlib?
+  // 压缩的方式
   switch (type) {
     case kNoCompression:
+      // 不压缩就直接赋值
       block_contents = raw;
       break;
 
+      // 待分析!!
     case kSnappyCompression: {
       std::string* compressed = &r->compressed_output;
       if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
@@ -170,35 +214,55 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
     }
   }
   WriteRawBlock(block_contents, type, handle);
+  // 压缩后的输出的清理
   r->compressed_output.clear();
+  // 重置block
+  // 修改finish标志位
   block->Reset();
 }
 
+// 已分析
+// 最后加上1byte type 以及 4bytes crc checksum
 void TableBuilder::WriteRawBlock(const Slice& block_contents,
                                  CompressionType type, BlockHandle* handle) {
   Rep* r = rep_;
+  // 设置偏移
   handle->set_offset(r->offset);
+  // 设置大小
   handle->set_size(block_contents.size());
+  // 内容写入.ldb文件
   r->status = r->file->Append(block_contents);
+  // 写入成功的话
   if (r->status.ok()) {
+    // 1byte type + 4byte checksum(crc)
     char trailer[kBlockTrailerSize];
+    // 这里的type代表的是 是否被压缩过
     trailer[0] = type;
+    // 获得crc
     uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
     crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer + 1, crc32c::Mask(crc));
+    // Append接受的是Slice
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
+    // 更新offset
     if (r->status.ok()) {
       r->offset += block_contents.size() + kBlockTrailerSize;
     }
   }
 }
 
+// 已分析
+// 返回当前的状态
 Status TableBuilder::status() const { return rep_->status; }
 
+// 不仅要将之前未达到阈值而没有写入的data写入
+// 还要带上index等附加的加速查找用的metadata(元数据)
 Status TableBuilder::Finish() {
   Rep* r = rep_;
+  // 将当前未写完的全部写入
   Flush();
   assert(!r->closed);
+  // 设置close标志
   r->closed = true;
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
@@ -258,6 +322,8 @@ void TableBuilder::Abandon() {
   r->closed = true;
 }
 
+// 已分析
+// 返回数量
 uint64_t TableBuilder::NumEntries() const { return rep_->num_entries; }
 
 uint64_t TableBuilder::FileSize() const { return rep_->offset; }

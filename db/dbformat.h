@@ -91,6 +91,9 @@ void AppendInternalKey(std::string* result, const ParsedInternalKey& key);
 // On error, returns false, leaves "*result" in an undefined state.
 bool ParseInternalKey(const Slice& internal_key, ParsedInternalKey* result);
 
+// 已分析
+// 取出真正的key
+// Remove掉seq+type的8bytes
 // Returns the user key portion of an internal key.
 inline Slice ExtractUserKey(const Slice& internal_key) {
   assert(internal_key.size() >= 8);
@@ -141,16 +144,25 @@ class InternalKey {
     AppendInternalKey(&rep_, ParsedInternalKey(user_key, s, t));
   }
 
+  // 已分析
+  // mutator
+  // 直接将值赋给内部的string rep_
   bool DecodeFrom(const Slice& s) {
     rep_.assign(s.data(), s.size());
     return !rep_.empty();
   }
 
+  // 已分析
+  // accessor
+  // 得到rep_
   Slice Encode() const {
     assert(!rep_.empty());
     return rep_;
   }
 
+  // 已分析
+  // 得到真正的user_key
+  // 将携带的seq和type去掉
   Slice user_key() const { return ExtractUserKey(rep_); }
 
   void SetFrom(const ParsedInternalKey& p) {

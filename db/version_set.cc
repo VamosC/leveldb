@@ -890,6 +890,7 @@ Status VersionSet::Recover(bool* save_manifest) {
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
   std::string current;
+  // dbname/CURRENT
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
     return s;
@@ -899,8 +900,11 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
   current.resize(current.size() - 1);
 
+  // CURRENT中存储的MANIFEST的格式是这样的:
+  // MANIFEST-000001 也就是说是去除目录前缀的
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
+  // 建立顺序读的文件
   s = env_->NewSequentialFile(dscname, &file);
   if (!s.ok()) {
     if (s.IsNotFound()) {

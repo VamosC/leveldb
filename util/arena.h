@@ -52,6 +52,9 @@ class Arena {
   std::atomic<size_t> memory_usage_;
 };
 
+// 已分析
+// 首先看之前留下来的空间够不够 够就分配
+// 否则开辟新的空间
 inline char* Arena::Allocate(size_t bytes) {
   // The semantics of what to return are a bit messy if we allow
   // 0-byte allocations, so we disallow them here (we don't need

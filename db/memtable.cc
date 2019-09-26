@@ -11,6 +11,9 @@
 
 namespace leveldb {
 
+// 已分析
+// 解构得到internalkey的Slice表达
+// 真正的剥离是在Compare中
 static Slice GetLengthPrefixedSlice(const char* data) {
   uint32_t len;
   const char* p = data;
@@ -18,13 +21,19 @@ static Slice GetLengthPrefixedSlice(const char* data) {
   return Slice(p, len);
 }
 
+// 已分析
+// 构造函数
 MemTable::MemTable(const InternalKeyComparator& comparator)
     : comparator_(comparator), refs_(0), table_(comparator_, &arena_) {}
 
 MemTable::~MemTable() { assert(refs_ == 0); }
 
+// 已分析
+// 直接调用arena的MemoryUsage
 size_t MemTable::ApproximateMemoryUsage() { return arena_.MemoryUsage(); }
 
+// 已分析
+// operator() 用于比较key的大小
 int MemTable::KeyComparator::operator()(const char* aptr,
                                         const char* bptr) const {
   // Internal keys are encoded as length-prefixed strings.
@@ -43,8 +52,11 @@ static const char* EncodeKey(std::string* scratch, const Slice& target) {
   return scratch->data();
 }
 
+// Iterator对待Memtable的所有操作
+// 最终都是调用其中的skiplist的iterator的相应操作来完成
 class MemTableIterator : public Iterator {
  public:
+ // 使用memtable中的skiplist来初始化
   explicit MemTableIterator(MemTable::Table* table) : iter_(table) {}
 
   MemTableIterator(const MemTableIterator&) = delete;
@@ -58,7 +70,10 @@ class MemTableIterator : public Iterator {
   void SeekToLast() override { iter_.SeekToLast(); }
   void Next() override { iter_.Next(); }
   void Prev() override { iter_.Prev(); }
+  // 解析出key
+  // key+seq 7bytes + type 1byte
   Slice key() const override { return GetLengthPrefixedSlice(iter_.key()); }
+  // 解析出value
   Slice value() const override {
     Slice key_slice = GetLengthPrefixedSlice(iter_.key());
     return GetLengthPrefixedSlice(key_slice.data() + key_slice.size());
@@ -67,12 +82,18 @@ class MemTableIterator : public Iterator {
   Status status() const override { return Status::OK(); }
 
  private:
+  // MemTable::Table => skiplist
+  // MemTable::Table::Iterator => skiplist::Iterator
   MemTable::Table::Iterator iter_;
   std::string tmp_;  // For passing to EncodeKey
 };
 
 Iterator* MemTable::NewIterator() { return new MemTableIterator(&table_); }
 
+// 已分析
+// internal_key的size = key的size + 8的原因在于
+// 8bytes 64bit 存储 seq的低56位和type的1byte
+// 即seq << 8 | type
 void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
                    const Slice& value) {
   // Format of an entry is concatenation of:
@@ -86,6 +107,8 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
   const size_t encoded_len = VarintLength(internal_key_size) +
                              internal_key_size + VarintLength(val_size) +
                              val_size;
+  // arena用于内存管理
+  // 暴露出裸指针
   char* buf = arena_.Allocate(encoded_len);
   char* p = EncodeVarint32(buf, internal_key_size);
   memcpy(p, key.data(), key_size);
@@ -95,6 +118,7 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
   assert(p + val_size == buf + encoded_len);
+  // 插入跳表
   table_.Insert(buf);
 }
 
